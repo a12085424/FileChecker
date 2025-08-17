@@ -20,7 +20,7 @@ class FileStructureChecker:
     def setup_gui(self):
         """设置图形界面"""
         self.root = tk.Tk()
-        self.root.title("文件结构检查工具 - 规则设定版")
+        self.root.title("文件结构检查工具 - by黄方")
         self.root.geometry("1100x800")
         # 创建主框架
         main_frame = ttk.Frame(self.root, padding="10")
@@ -111,7 +111,8 @@ class FileStructureChecker:
         path_frame.columnconfigure(1, weight=1)
         ttk.Label(path_frame, text="文件夹路径:").grid(row=0, column=0, sticky=tk.W)
         self.path_var = tk.StringVar(value=str(self.root_folder))
-        path_entry = ttk.Entry(path_frame, textvariable=self.path_var, width=50)
+        # 增大 Entry 的高度可以通过增大字体实现
+        path_entry = ttk.Entry(path_frame, textvariable=self.path_var, width=50, font=("Arial", 10)) # 增大字体
         path_entry.grid(row=0, column=1, padx=(10, 10), sticky=(tk.W, tk.E))
         browse_btn = ttk.Button(path_frame, text="浏览...", command=self.browse_folder)
         browse_btn.grid(row=0, column=2)
@@ -155,20 +156,26 @@ class FileStructureChecker:
         file_rules_scrollbar = ttk.Scrollbar(file_rules_frame, orient="vertical", command=self.file_rules_listbox.yview)
         file_rules_scrollbar.grid(row=1, column=1, sticky=(tk.N, tk.S))
         self.file_rules_listbox.configure(yscrollcommand=file_rules_scrollbar.set)
-        # 常用模式说明
+        # 预设管理 - 移动到这里，放在文件规则下方
+        # 创建一个新的 Frame 来放置预设按钮，避免遮挡
+        preset_frame = ttk.Frame(right_frame) # 新建 Frame
+        preset_frame.grid(row=4, column=0, sticky=tk.W, pady=(0, 10)) # 原来是 row=2，现在是 row=4
+        save_preset_btn = ttk.Button(preset_frame, text="保存预设", command=self.save_preset)
+        save_preset_btn.pack(side=tk.LEFT, padx=(0, 10))
+        load_preset_btn = ttk.Button(preset_frame, text="加载预设", command=self.load_preset)
+        load_preset_btn.pack(side=tk.LEFT)
+        # 常用模式说明 - 减小 pady 为 (10, 0) -> (5, 0)，减小内部 help_text_widget 高度
         help_frame = ttk.LabelFrame(right_frame, text="常用模式说明", padding="5")
-        help_frame.grid(row=4, column=0, sticky=(tk.W, tk.E), pady=(10, 0))
+        help_frame.grid(row=5, column=0, sticky=(tk.W, tk.E), pady=(5, 0)) # 修改了 pady
         help_frame.columnconfigure(0, weight=1)
+        # 更新 help_text，移除层级说明
         help_text = """
         常用模式：
         \\d{4} - 4位数字    \\d+ - 任意位数数字    (选项1|选项2) - 多选一
         [年份4位] - 4位年份    [数字] - 数字    [日期8位] - 8位日期
         [任意字符] - 任意字符    [字母] - 字母    [汉字] - 汉字
         [列表名] - 使用自定义列表中的值
-        层级说明：
-        1 - 根目录下的第一层文件夹/文件
-        2 - 第二层文件夹/文件
-        """
+        """ # 移除了层级说明部分
         help_label = ttk.Label(help_frame, text=help_text)
         help_label.grid(row=0, column=0, sticky=tk.W)
         rules_frame.columnconfigure(0, weight=1)
@@ -579,11 +586,9 @@ class FileStructureChecker:
             items = list(current_path.iterdir())
             folders = [item for item in items if item.is_dir()]
             files = [item for item in items if item.is_file()]
-            
             # --- 核心修复1: 正确初始化 current_list_values ---
             # 始终从 parent_list_values 复制，确保包含所有上级信息
             current_list_values = parent_list_values.copy()
-
             # --- 核心修复2: 文件夹规则层级逻辑 ---
             # 只有当 level > 0 时，才检查当前文件夹的命名规则
             # level = 0 时，current_path 是用户选择的根目录，不检查其命名规则
@@ -614,7 +619,6 @@ class FileStructureChecker:
                             # 1. 祖父级及更上级传递下来的列表值 (parent_list_values.copy())
                             # 2. 当前文件夹 newly 提取到的列表值 (extracted_values)
                             current_list_values.update(extracted_values)
-                            
                             # 检查列表匹配规则 (文件夹与上级文件夹的列表值比较)
                             list_matching = rule.get('list_matching', {})
                             for list_name, should_match_parent in list_matching.items():
@@ -633,7 +637,6 @@ class FileStructureChecker:
                                             'expected': pattern,
                                             'actual_name': current_path.name
                                         })
-
             # 检查当前层级的文件 (文件规则层级逻辑保持不变)
             # level = 0 时检查根目录下的文件 (用户层级1)
             # level = 1 时检查根目录下第一层文件夹内的文件 (用户层级2)
@@ -662,7 +665,6 @@ class FileStructureChecker:
                             # 1. 祖父级的列表值 (从递归调用传入)
                             # 2. 如果直接父文件夹命名匹配成功，还包含了直接父文件夹的列表值
                             # 这使得文件可以与其直接父文件夹(如果父文件夹命名匹配)或祖父级文件夹进行列表值比较
-                            
                             list_matching = rule.get('list_matching', {})
                             for list_name, should_match_parent in list_matching.items():
                                 # 检查条件：
@@ -692,7 +694,6 @@ class FileStructureChecker:
                                 'message': f"文件 '{file_path.name}' 扩展名不符合要求，应为: {', '.join(extensions)}",
                                 'expected': extensions
                             })
-
             # 递归检查子文件夹
             for folder in folders:
                 # 传递更新后的 current_list_values
@@ -761,6 +762,58 @@ class FileStructureChecker:
                 messagebox.showinfo("成功", f"结果已保存到：\n{file_path}")
             except Exception as e:
                 messagebox.showerror("错误", f"保存失败：\n{str(e)}")
+
+    # --- 新增功能：保存和加载预设 ---
+    def save_preset(self):
+        """保存当前配置为预设"""
+        file_path = filedialog.asksaveasfilename(
+            defaultextension=".json",
+            filetypes=[("JSON 文件", "*.json"), ("所有文件", "*.*")],
+            title="保存预设"
+        )
+        if file_path:
+            try:
+                # 准备要保存的数据
+                preset_data = {
+                    'custom_lists': self.custom_lists,
+                    'folder_rules': self.folder_rules,
+                    'file_rules': self.file_rules
+                }
+                # 写入文件
+                with open(file_path, 'w', encoding='utf-8') as f:
+                    json.dump(preset_data, f, ensure_ascii=False, indent=4)
+                messagebox.showinfo("成功", f"预设已保存到：\n{file_path}")
+            except Exception as e:
+                messagebox.showerror("错误", f"保存预设失败：\n{str(e)}")
+
+    def load_preset(self):
+        """从文件加载预设配置"""
+        file_path = filedialog.askopenfilename(
+            filetypes=[("JSON 文件", "*.json"), ("所有文件", "*.*")],
+            title="加载预设"
+        )
+        if file_path:
+            try:
+                # 从文件读取数据
+                with open(file_path, 'r', encoding='utf-8') as f:
+                    preset_data = json.load(f)
+                # 更新内存中的数据结构
+                # 注意：直接赋值引用可能导致问题，最好进行深拷贝或确保数据结构正确
+                # 这里假设 JSON 数据结构与程序内部完全一致
+                self.custom_lists = preset_data.get('custom_lists', {})
+                self.folder_rules = {int(k): v for k, v in preset_data.get('folder_rules', {}).items()} # 确保键是整数
+                self.file_rules = {int(k): v for k, v in preset_data.get('file_rules', {}).items()} # 确保键是整数
+                # 更新 GUI 显示
+                self.update_lists_display()
+                self.update_folder_rules_list()
+                self.update_file_rules_list()
+                # 清空列表项显示，因为列表可能已更改
+                self.list_items_listbox.delete(0, tk.END)
+                messagebox.showinfo("成功", f"预设已从以下位置加载：\n{file_path}")
+            except json.JSONDecodeError as e:
+                messagebox.showerror("错误", f"预设文件格式错误：\n{str(e)}")
+            except Exception as e:
+                messagebox.showerror("错误", f"加载预设失败：\n{str(e)}")
 
     def run(self):
         """运行GUI"""
